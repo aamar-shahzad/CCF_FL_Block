@@ -1,0 +1,20 @@
+# 5-client CCFL — Fashion-MNIST data + ImageNet-pretrained CNN (weights download on first run)
+dataset: fashion_mnist
+method: ccfl
+num_clients: 5
+sandbox_users: 5
+rounds: 10
+local_epochs: 2
+distribution: iid
+malicious_frac: 0.0
+attack: none
+register_clients: true
+offchain: true
+k_sigma: 2.5
+seed: 42
+fl_backend: numpy
+model_init: paper
+# For ImageNet weights (needs TensorFlow + AVX): set model_init: keras_pretrained
+# keras_application: MobileNetV2
+keras_input_size: 96
+keras_weights: imagenet

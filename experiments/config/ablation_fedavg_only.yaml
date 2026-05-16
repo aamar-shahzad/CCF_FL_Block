@@ -1,0 +1,12 @@
+dataset: cifar10
+method: fedavg
+num_clients: 10
+rounds: 10
+distribution: non_iid
+malicious_frac: 0.3
+attack: model_poisoning
+local_epochs: 2
+register_clients: false
+offchain: true
+seed: 42
+fl_backend: numpy

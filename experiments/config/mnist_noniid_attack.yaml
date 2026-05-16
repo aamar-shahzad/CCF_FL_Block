@@ -1,0 +1,16 @@
+dataset: mnist
+method: ccfl
+num_clients: 5
+sandbox_users: 5
+rounds: 10
+distribution: non_iid
+alpha: 0.5
+malicious_frac: 0.4
+attack: model_poisoning
+attack_strength: 0.5
+local_epochs: 1
+register_clients: true
+offchain: true
+k_sigma: 2.5
+seed: 42
+fl_backend: numpy

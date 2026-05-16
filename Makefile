@@ -4,8 +4,9 @@ BUILD=build
 CCF_PREFIX_VIRTUAL=/opt/ccf_virtual
 CCF_PREFIX_SGX=/opt/ccf_sgx
 
-CC!=which clang-15
-CXX!=which clang++-15
+# CCF 5.x dev image ships clang-15; older images use clang-10/12
+CC := $(shell command -v clang-15 2>/dev/null || command -v clang-12 2>/dev/null || command -v clang-10 2>/dev/null || command -v clang)
+CXX := $(shell command -v clang++-15 2>/dev/null || command -v clang++-12 2>/dev/null || command -v clang++-10 2>/dev/null || command -v clang++)
 
 OE_CC!=which clang-11
 OE_CXX!=which clang++-11
@@ -17,8 +18,8 @@ H_FILES=$(wildcard cpp/**/*.h)
 H_FILES=$(wildcard cpp/**/*.hpp)
 BIN_DIR=bin
 
-CCF_VER=ccf-4.0.7
-CCF_VER_LOWER=ccf_virtual_4.0.7
+CCF_VER=ccf-5.0.0
+CCF_VER_LOWER=ccf_virtual_5.0.0
 CCF_SGX_VER_LOWER=ccf_sgx_4.0.7
 CCF_SGX_UNSAFE_VER_LOWER=ccf_sgx_unsafe_4.0.7
 
@@ -87,10 +88,11 @@ debug-dockerignore:
 	docker build --no-cache -t build-context -f Dockerfile.ignore .
 	docker run --rm build-context
 
+SANDBOX_USERS ?= 100
+
 .PHONY: run-virtual
 run-virtual: build-virtual
-	
-	VENV_DIR=.venv $(CCF_PREFIX_VIRTUAL)/bin/sandbox.sh -p $(BUILD)/liblskv.virtual.so -e virtual -t virtual  --initial-member-count 3 --initial-user-count 4   --max-http-body-size 104857600 
+	VENV_DIR=.venv $(CCF_PREFIX_VIRTUAL)/bin/sandbox.sh -p $(BUILD)/liblskv.virtual.so -e virtual -t virtual --initial-member-count 3 --initial-user-count $(SANDBOX_USERS) --max-http-body-size 104857600
 	
 
 
@@ -112,9 +114,28 @@ run-sgx: build-sgx
 
 
 
+.PHONY: run-experiment run-fl-virtual run-fl-sgx
+run-experiment run-fl-virtual: .venv
+	. .venv/bin/activate && python -m experiments.runner.run_ccf_fl --platform virtual --config experiments/config/mnist_iid.yaml
+
+run-fl-sgx: .venv build-sgx
+	. .venv/bin/activate && python -m experiments.runner.run_ccf_fl --platform sgx --config experiments/config/mnist_iid.yaml
+
+.PHONY: run-paper-batch
+run-paper-batch: .venv
+	. .venv/bin/activate && python -m experiments.runner.run_paper_batch
+
+.PHONY: figures
+figures: .venv
+	. .venv/bin/activate && python experiments/plots/generate_figures.py
+
+.PHONY: test-ahda
+test-ahda:
+	g++ -std=c++17 -I cpp/app tests/test_aggregation.cpp -o /tmp/test_ahda && /tmp/test_ahda
+
 .PHONY: tests
-tests: build-virtual .venv
-	. .venv/bin/activate && pytest -v
+tests: .venv
+	. .venv/bin/activate && pytest -v tests/
 
 
 

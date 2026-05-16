@@ -1,0 +1,13 @@
+dataset: fashion_mnist
+method: ccfl
+num_clients: 10
+rounds: 10
+distribution: iid
+malicious_frac: 0.0
+attack: none
+local_epochs: 1
+register_clients: true
+offchain: true
+k_sigma: 2.5
+seed: 42
+fl_backend: numpy

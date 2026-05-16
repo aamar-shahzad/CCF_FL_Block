@@ -1,0 +1,20 @@
+# 5-client CCFL experiment — MNIST (downloaded at run time; no TensorFlow when fl_backend: numpy)
+# Optional: set model_id to reuse a model already on CCF (skip upload). Set start_round to continue.
+# model_id: 0
+# start_round: 0
+dataset: mnist
+method: ccfl
+num_clients: 5
+sandbox_users: 5
+rounds: 10
+local_epochs: 2
+distribution: iid
+malicious_frac: 0.0
+attack: none
+register_clients: true
+offchain: true
+k_sigma: 2.5
+seed: 42
+model_init: paper
+# Use numpy on CPUs without AVX (Apple Silicon emulated amd64); use tensorflow on AVX/x86 Linux
+fl_backend: numpy

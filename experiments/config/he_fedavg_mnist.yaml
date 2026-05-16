@@ -1,0 +1,15 @@
+dataset: mnist
+method: he_based
+num_clients: 4
+sandbox_users: 4
+rounds: 3
+distribution: iid
+malicious_frac: 0.0
+attack: none
+local_epochs: 1
+register_clients: false
+offchain: false
+he_key_bits: 1024
+he_scale: 10000
+seed: 42
+fl_backend: numpy

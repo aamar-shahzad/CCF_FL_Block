@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCFL — Federated Learning on CCF</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CCFL Federated Learning</h1>
+            <p>End-to-end FL on CCF: datasets and models are fetched automatically; aggregation uses CCFL (AHDA) on the ledger.</p>
+            <p class="text-muted">UI: <strong>http://localhost:8080</strong> (after devcontainer rebuild) · CCF: <strong>https://localhost:8000</strong></p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="experiments">Experiments</button>
+            <button class="tab-btn" data-tab="results">Results</button>
+            <button class="tab-btn" data-tab="ledger">CCF Ledger</button>
+            <button class="tab-btn" data-tab="system">System</button>
+        </nav>
+
+        <main>
+            <div id="experiments" class="tab-content active">
+                <div class="card">
+                    <h2>Run CCFL experiment</h2>
+                    <p>Each run downloads the dataset, registers a global model on CCF, trains <em>N</em> clients locally, uploads weights, and aggregates with CCFL on-chain.</p>
+                    <div id="experiments-message" class="message"></div>
+
+                    <div class="form-group">
+                        <label for="expConfig">Experiment</label>
+                        <select id="expConfig"></select>
+                    </div>
+                    <div id="expConfigDetails" class="run-summary mb-16" aria-live="polite"></div>
+
+                    <div class="form-group">
+                        <label for="expPlatform">CCF platform</label>
+                        <select id="expPlatform">
+                            <option value="virtual" selected>virtual</option>
+                            <option value="sgx">sgx</option>
+                            <option value="auto">auto</option>
+                        </select>
+                    </div>
+
+                    <details class="mb-16">
+                        <summary>Advanced options</summary>
+                        <div class="form-group mt-8">
+                            <label>
+                                <input type="checkbox" id="expUseExistingModel">
+                                Reuse existing model ID (skip new model registration)
+                            </label>
+                        </div>
+                        <div class="form-group" id="expModelIdGroup" style="display: none;">
+                            <label for="expModelId">Model ID</label>
+                            <input type="number" id="expModelId" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="expStartRound">Start round</label>
+                            <input type="number" id="expStartRound" min="0" value="0" title="Leave at 0 for a new run">
+                        </div>
+                    </details>
+
+                    <div class="auth-actions">
+                        <button type="button" id="run-experiment-btn" class="btn btn-success">Run experiment</button>
+                        <button type="button" id="stop-experiment-btn" class="btn btn-secondary">Stop</button>
+                        <button type="button" id="refresh-exp-status-btn" class="btn btn-secondary">Refresh</button>
+                    </div>
+
+                    <div id="experiment-loading" class="loading" style="display: none;">
+                        <div class="spinner"></div>
+                        <span class="ml-8">Running…</span>
+                    </div>
+
+                    <div id="experiment-progress" class="experiment-progress mt-16" hidden>
+                        <h3>Live progress</h3>
+                        <div id="experiment-progress-meta" class="text-muted"></div>
+                        <div class="progress-bar-track"><div id="experiment-progress-fill" class="progress-bar-fill"></div></div>
+                        <div id="experiment-progress-stats" class="experiment-progress-stats"></div>
+                        <div id="experiment-live-chart" class="results-chart-wrap"></div>
+                    </div>
+
+                    <div id="experiment-status" class="mt-16">
+                        <h3>Status</h3>
+                        <pre id="experiment-status-content" class="json-viewer">—</pre>
+                    </div>
+                    <div id="experiment-log" class="mt-16">
+                        <h3>Log</h3>
+                        <pre id="experiment-log-content" class="json-viewer" style="max-height: 360px; overflow: auto;">—</pre>
+                    </div>
+                </div>
+            </div>
+
+            <div id="results" class="tab-content">
+                <div class="card results-card">
+                    <div class="results-header">
+                        <div>
+                            <h2>Experiment results</h2>
+                            <p class="text-muted">CCFL runs from <code>results/</code> — click a row for charts and per-round metrics.</p>
+                        </div>
+                        <button type="button" id="refresh-results-btn" class="btn btn-primary">Refresh</button>
+                    </div>
+                    <div id="results-summary" class="results-summary"></div>
+                    <div class="results-toolbar">
+                        <label class="results-filter"><span>Dataset</span>
+                            <select id="results-filter-dataset"><option value="">All</option></select></label>
+                        <label class="results-filter"><span>Method</span>
+                            <select id="results-filter-method"><option value="">All</option></select></label>
+                        <label class="results-filter"><span>Sort</span>
+                            <select id="results-sort">
+                                <option value="date">Newest first</option>
+                                <option value="accuracy">Best accuracy</option>
+                            </select></label>
+                        <button type="button" id="results-compare-btn" class="btn btn-secondary" disabled>Compare selected (0)</button>
+                        <button type="button" id="results-compare-clear-btn" class="btn btn-secondary btn-sm">Clear</button>
+                    </div>
+                    <div id="results-compare-panel" class="results-compare-panel" hidden>
+                        <h3>Compare runs</h3>
+                        <div id="results-compare-chart" class="results-chart-wrap"></div>
+                        <div id="results-compare-legend" class="compare-legend"></div>
+                    </div>
+                    <div id="results-table-wrap" class="results-table-wrap"></div>
+                    <div id="results-detail" class="results-detail-panel" hidden>
+                        <div class="results-detail-header">
+                            <div>
+                                <h3 id="results-detail-title">Run detail</h3>
+                                <p id="results-detail-subtitle" class="text-muted"></p>
+                            </div>
+                            <div class="results-detail-actions">
+                                <a id="results-export-link" class="btn btn-secondary btn-sm" href="#" download>Export metrics</a>
+                                <button type="button" id="results-detail-close" class="btn btn-secondary btn-sm">Close</button>
+                            </div>
+                        </div>
+                        <div id="results-detail-cards" class="results-stat-cards"></div>
+                        <div id="results-chart-wrap" class="results-chart-wrap"></div>
+                        <div id="results-rounds-wrap" class="results-rounds-wrap"></div>
+                        <details class="results-config-details">
+                            <summary>Config</summary>
+                            <pre id="results-config-json" class="json-viewer"></pre>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+
+            <div id="ledger" class="tab-content">
+                <div class="card ledger-card">
+                    <h2>CCF ledger — all APIs</h2>
+                    <p class="text-muted">Every FL app route and CCF built-in from the sandbox. Client calls use <code>user0</code>–<code>user4</code>; aggregation and client registration use <code>member0</code>.</p>
+                    <div id="ledger-message" class="message"></div>
+
+
+                    <section class="ledger-activity-panel" id="ledger-activity-panel">
+                        <div class="ledger-activity-header">
+                            <div>
+                                <h3>Live CCF activity</h3>
+                                <p class="text-muted">Recent ledger transactions, UI writes, and experiment log lines — refreshes every 3s.</p>
+                            </div>
+                            <div class="ledger-activity-controls">
+                                <label class="results-filter"><span>Auto</span>
+                                    <input type="checkbox" id="ledger-activity-auto" checked>
+                                </label>
+                                <button type="button" id="ledger-activity-refresh-btn" class="btn btn-secondary btn-sm">Refresh now</button>
+                            </div>
+                        </div>
+                        <div id="ledger-activity-stats" class="ledger-activity-stats"></div>
+                        <div id="ledger-activity-feed" class="ledger-activity-feed">
+                            <p class="text-muted">Open this tab to load CCF activity…</p>
+                        </div>
+                    </section>
+
+                    <div class="ledger-toolbar ledger-context">
+                        <label class="results-filter"><span>Model ID</span>
+                            <select id="ledger-model-id"><option value="0">0</option></select>
+                        </label>
+                        <label class="results-filter"><span>Round</span>
+                            <input type="number" id="ledger-round-no" min="0" value="0" style="width:72px">
+                        </label>
+                        <label class="results-filter"><span>User cert</span>
+                            <select id="ledger-user-id">
+                                <option value="0">user0</option>
+                                <option value="1">user1</option>
+                                <option value="2">user2</option>
+                                <option value="3">user3</option>
+                                <option value="4">user4</option>
+                            </select>
+                        </label>
+                        <button type="button" id="ledger-discover-btn" class="btn btn-secondary">Discover models</button>
+                    </div>
+
+                    <div class="ledger-grid">
+                        <section class="ledger-section" id="ledger-sec-read">
+                            <h3>Read <span class="pill pill-muted">GET · user</span></h3>
+                            <div class="ledger-actions">
+                                <button type="button" id="ledger-metadata-btn" class="btn btn-primary btn-sm">GET model metadata</button>
+                                <button type="button" id="ledger-weights-btn" class="btn btn-primary btn-sm">GET global weights</button>
+                                <a id="ledger-weights-download" class="btn btn-success btn-sm" href="#">Download weights</a>
+                                <button type="button" id="ledger-stats-btn" class="btn btn-secondary btn-sm">GET aggregate stats</button>
+                            </div>
+                        </section>
+
+                        <section class="ledger-section" id="ledger-sec-write-open">
+                            <h3>Register model <span class="pill pill-success">POST · no auth</span></h3>
+                            <div class="form-group">
+                                <label for="ledger-model-name">Model name</label>
+                                <input type="text" id="ledger-model-name" value="mnist">
+                            </div>
+                            <div class="form-group">
+                                <label for="ledger-model-data">model_data (JSON)</label>
+                                <textarea id="ledger-model-data" class="ledger-textarea" rows="4">{"dataset":"mnist","num_classes":10,"architecture":"CCFL_NumpySoftmax","model_init":"paper"}</textarea>
+                            </div>
+                            <button type="button" id="ledger-register-model-btn" class="btn btn-success btn-sm">POST /model/intial_model</button>
+                        </section>
+
+                        <section class="ledger-section" id="ledger-sec-upload">
+                            <h3>Upload weights <span class="pill pill-ccfl">POST · user</span></h3>
+                            <div class="form-group">
+                                <label for="ledger-client-id">client_id</label>
+                                <input type="text" id="ledger-client-id" value="client_0">
+                            </div>
+                            <div class="form-group">
+                                <label for="ledger-weights-json">weights_json</label>
+                                <textarea id="ledger-weights-json" class="ledger-textarea" rows="3">[0.01, -0.02, 0.03, 0.04, -0.05, 0.06, 0.07, -0.08, 0.09, 0.1]</textarea>
+                            </div>
+                            <button type="button" id="ledger-upload-weights-btn" class="btn btn-primary btn-sm">POST /model/upload/local_model_weights</button>
+                        </section>
+
+                        <section class="ledger-section" id="ledger-sec-member">
+                            <h3>Member ops <span class="pill pill-warning">member0</span></h3>
+                            <div class="form-group">
+                                <label for="ledger-register-client-id">Register client_id</label>
+                                <input type="text" id="ledger-register-client-id" value="client_0">
+                            </div>
+                            <button type="button" id="ledger-register-client-btn" class="btn btn-secondary btn-sm">POST /model/register_client</button>
+                            <hr class="ledger-hr">
+                            <div class="ledger-toolbar ledger-toolbar-inline">
+                                <label class="results-filter"><span>Method</span>
+                                    <select id="ledger-agg-method">
+                                        <option value="ahda">ahda</option>
+                                        <option value="fedavg">fedavg</option>
+                                        <option value="krum">krum</option>
+                                        <option value="he">he</option>
+                                    </select>
+                                </label>
+                                <label class="results-filter"><span>k_sigma</span>
+                                    <input type="number" id="ledger-k-sigma" value="2.5" step="0.1" style="width:64px">
+                                </label>
+                                <label class="results-filter"><span><input type="checkbox" id="ledger-use-adaptive" checked> adaptive</span></label>
+                                <label class="results-filter"><span><input type="checkbox" id="ledger-partitioned"> partitioned</span></label>
+                            </div>
+                            <button type="button" id="ledger-aggregate-btn" class="btn btn-warning btn-sm">PUT /model/aggregate_weights_local</button>
+                        </section>
+
+                        <section class="ledger-section" id="ledger-sec-user-add">
+                            <h3>User store <span class="pill pill-success">POST · no auth</span></h3>
+                            <div class="form-group">
+                                <label for="ledger-user-msg">msg</label>
+                                <input type="text" id="ledger-user-msg" value="hello from UI">
+                            </div>
+                            <button type="button" id="ledger-user-add-btn" class="btn btn-secondary btn-sm">POST /user/add</button>
+                        </section>
+
+                        <section class="ledger-section" id="ledger-sec-platform">
+                            <h3>CCF built-ins <span class="pill pill-method">GET · user</span></h3>
+                            <div class="form-group">
+                                <label for="ledger-tx-id">transaction_id</label>
+                                <input type="text" id="ledger-tx-id" placeholder="2.18">
+                            </div>
+                            <div class="ledger-actions">
+                                <button type="button" id="ledger-tx-btn" class="btn btn-secondary btn-sm">GET /tx</button>
+                                <button type="button" id="ledger-commit-btn" class="btn btn-secondary btn-sm">GET /commit</button>
+                                <button type="button" id="ledger-receipt-btn" class="btn btn-secondary btn-sm">GET /receipt</button>
+                                <button type="button" id="ledger-openapi-btn" class="btn btn-secondary btn-sm">GET /api (paths)</button>
+                                <button type="button" id="ledger-openapi-full-btn" class="btn btn-secondary btn-sm">OpenAPI full</button>
+                            </div>
+                        </section>
+                    </div>
+
+                    <details class="ledger-panel mt-16" open>
+                        <summary>Last API response</summary>
+                        <pre id="ledger-response" class="json-viewer ledger-response">—</pre>
+                    </details>
+
+                    <details class="ledger-panel mt-16">
+                        <summary>API catalog — click Run</summary>
+                        <div id="ledger-endpoints-table" class="ledger-endpoints-wrap"></div>
+                    </details>
+                </div>
+            </div>
+
+            <div id="system" class="tab-content">
+                <div class="card">
+                    <h2>System</h2>
+                    <div id="system-message" class="message"></div>
+                    <div id="system-dashboard" class="system-dashboard"></div>
+                    <div class="auth-actions">
+                        <button type="button" id="refresh-system-btn" class="btn btn-primary">Refresh status</button>
+                        <button type="button" id="clean-sandbox-btn" class="btn btn-warning">Clean sandbox</button>
+                    </div>
+                    <pre id="system-status-content" class="json-viewer mt-16">—</pre>
+                    <div class="auth-info mt-16">
+                        <h3>Start CCF (terminal)</h3>
+                        <pre class="json-viewer">cd /workspaces/CCF_FL_Block
+make run-virtual SANDBOX_USERS=5</pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>CCFL — Confidential federated learning on Microsoft CCF</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

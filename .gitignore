@@ -4,3 +4,11 @@
 **/workspace/
 **/venv/
 .gitmodules
+data/offchain/**
+results/**
+figures/*.png
+!figures/.gitkeep
+__pycache__/
+*.pyc
+paper.pdf
+paper.tex

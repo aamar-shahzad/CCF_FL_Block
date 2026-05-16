@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCF API Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .pending { color: orange; }
+        button { padding: 10px 15px; margin: 5px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 CCF API Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Proxy Server Test</h2>
+        <button onclick="testProxyServer()">Test Proxy Server</button>
+        <div id="proxy-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. CCF Backend Test (Direct)</h2>
+        <button onclick="testCCFBackend()">Test CCF Backend</button>
+        <div id="ccf-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Simple User Add Test</h2>
+        <button onclick="testUserAdd()">Test User Add</button>
+        <div id="user-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Network Status</h2>
+        <div id="network-status"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function testProxyServer() {
+            showResult('proxy-result', 'Testing proxy server...', 'pending');
+            
+            fetch('/api/health', {
+                method: 'GET'
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            })
+            .then(data => {
+                showResult('proxy-result', `✅ Proxy server is running!<br>Response: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                showResult('proxy-result', `❌ Proxy server error: ${error.message}<br><br>Make sure to run: python proxy_server.py`, 'error');
+            });
+        }
+
+        function testCCFBackend() {
+            showResult('ccf-result', 'Testing CCF backend...', 'pending');
+            
+            const formData = new FormData();
+            formData.append('method', 'GET');
+            formData.append('url', 'https://127.0.0.1:8000/user/add');
+            formData.append('service_cert_path', 'workspace/sandbox_common/service_cert.pem');
+            fetch('/api/proxy', { method: 'POST', body: formData })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            })
+            .then(data => {
+                showResult('ccf-result', `✅ CCF backend is running!<br>Response: ${data.substring(0, 200)}...`, 'success');
+            })
+            .catch(error => {
+                showResult('ccf-result', `❌ CCF backend error: ${error.message}<br><br>Make sure your CCF server is running on port 8000`, 'error');
+            });
+        }
+
+        function testUserAdd() {
+            showResult('user-result', 'Testing user add...', 'pending');
+            
+            const testData = {
+                msg: "Test user from debug page"
+            };
+            
+            const formData = new FormData();
+            formData.append('method', 'POST');
+            formData.append('url', 'https://127.0.0.1:8000/user/add');
+            formData.append('data', JSON.stringify(testData));
+            formData.append('service_cert_path', 'workspace/sandbox_common/service_cert.pem');
+            fetch('/api/proxy', { method: 'POST', body: formData })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.text().then(text => {
+                        throw new Error(`HTTP ${response.status}: ${text}`);
+                    });
+                }
+            })
+            .then(data => {
+                showResult('user-result', `✅ User add successful!<br>Response: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                showResult('user-result', `❌ User add failed: ${error.message}`, 'error');
+            });
+        }
+
+        function checkNetworkStatus() {
+            const status = document.getElementById('network-status');
+            let html = '<h3>Network Connectivity:</h3>';
+            
+            // Test proxy server
+            fetch('/api/health')
+                .then(response => {
+                    html += '<div class="success">✅ Proxy server: Connected</div>';
+                    const fd = new FormData();
+                    fd.append('method', 'GET');
+                    fd.append('url', 'https://127.0.0.1:8000/user/add');
+                    fd.append('service_cert_path', 'workspace/sandbox_common/service_cert.pem');
+                    return fetch('/api/proxy', { method: 'POST', body: fd });
+                })
+                .then(response => {
+                    html += '<div class="success">✅ CCF backend: Connected</div>';
+                })
+                .catch(error => {
+                    html += '<div class="error">❌ CCF backend: Not accessible</div>';
+                })
+                .finally(() => {
+                    status.innerHTML = html;
+                });
+        }
+
+        // Auto-check network status on page load
+        window.onload = function() {
+            checkNetworkStatus();
+        };
+    </script>
+</body>
+</html> 

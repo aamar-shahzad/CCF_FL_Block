@@ -1,98 +1,42 @@
 #!/bin/bash
+# Smoke test for CCFL FL API (run after: make run-virtual)
+set -euo pipefail
 
-# Define colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Number of times to run the loop
-num_runs=200
+CERT_DIR="${CERT_DIR:-.sandbox_ccf}"
+BASE="https://127.0.0.1:8000/app"
+CACERT="${CACERT:-./workspace/sandbox_common/service_cert.pem}"
 
-# Initialize variables for total time, total successful requests, and total failed requests
-total_time=0
-total_success=0
-total_fail=0
+if [ ! -f "$CACERT" ] && [ -f "$CERT_DIR/../workspace/sandbox_common/service_cert.pem" ]; then
+  CACERT="$CERT_DIR/../workspace/sandbox_common/service_cert.pem"
+fi
 
-# Initialize variables for calculating requests per second
-start_timestamp=$(date +%s)
-requests_per_second=0
+echo "Uploading initial model..."
+MODEL_RESP=$(curl -sk -X POST "$BASE/model/intial_model" \
+  -H "Content-Type: application/json" \
+  -d '{"global_model":{"model_name":"smoke","model_data":{"layers":2}}}')
+MODEL_ID=$(echo "$MODEL_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('model_id',0))" 2>/dev/null || echo "0")
+echo "model_id=$MODEL_ID"
 
-# Initialize variables for the progress bar
-progress_bar=""
+echo "Uploading local weights (user0)..."
+curl -sk -X POST "$BASE/model/upload/local_model_weights" \
+  --cert "$CERT_DIR/user0_cert.pem" --key "$CERT_DIR/user0_privk.pem" \
+  -H "Content-Type: application/json" \
+  -d "{\"model_id\":$MODEL_ID,\"round_no\":0,\"weights_json\":[0.1,0.2,0.3],\"client_id\":\"client_0\"}"
 
-# Function to print a progress bar
-print_progress() {
-  local percent=$1
-  local fill=$(printf "%0.s=" $(seq 1 $percent))
-  local empty=$(printf "%0.s " $(seq $((100 - percent))))
-  progress_bar="\r[$fill$empty] $percent%"
-  echo -ne "$progress_bar"
-}
+echo "Aggregating (member0, AHDA)..."
+AGG=$(curl -sk -X PUT \
+  "$BASE/model/aggregate_weights_local?model_id=$MODEL_ID&round_no=0&method=ahda" \
+  --cert "$CERT_DIR/member0_cert.pem" --key "$CERT_DIR/member0_privk.pem")
+echo "$AGG" | head -c 200
+echo
 
-# Loop through the specified number of runs
-for ((i=1; i<=$num_runs; i++)); do
-  start_time=$(date +%s%N)
+echo "Downloading global weights..."
+curl -sk "$BASE/model/download_gloabl_weights?model_id=$MODEL_ID" \
+  --cert "$CERT_DIR/user0_cert.pem" --key "$CERT_DIR/user0_privk.pem" | head -c 200
+echo
 
-  # Generate random values for parameters
-  model_id=$((1 + RANDOM % 1000))
-  param1=$(awk -v min=0.1 -v max=1 -v scale=100 'BEGIN{srand(); print int(min*scale+rand()*(max-min)*scale)/scale}')
-  param2=$(awk -v min=0.1 -v max=1 -v scale=100 'BEGIN{srand(); print int(min*scale+rand()*(max-min)*scale)/scale}')
-
-  # Send the POST request to create a model with random values
-  response=$(curl -X POST https://127.0.0.1:8000/app/model \
-    --cacert ./workspace/sandbox_common/service_cert.pem \
-    -H "Content-Type: application/json" \
-    -d "{\"msg\": \"{\\\"model_id\\\":$model_id,\\\"modelName\\\":\\\"CNN\\\",\\\"weights\\\":{\\\"param1\\\":$param1,\\\"param2\\\":$param2}}\"}")
-
-  end_time=$(date +%s%N)
-
-  # Calculate the time taken for the request in milliseconds
-  time_taken=$(( (end_time - start_time) / 1000000 ))
-
-  # Add the time taken to the total time
-  total_time=$((total_time + time_taken))
-
-  # Use the plain response as model_id
-  model_id="$response"
-
-  # Check if model_id is not empty
-  if [ -n "$model_id" ] && [ "$model_id" != "null" ]; then
-    # Send the GET request to retrieve the model using the model_id
-    result=$(curl -s -o /dev/null -w "%{http_code}" -X GET "https://127.0.0.1:8000/app/model?model_id=$model_id" \
-      --cacert ./workspace/sandbox_common/service_cert.pem)
-    
-    # Print test result in green for success and red for failure
-    if [ "$result" -eq 200 ]; then
-      total_success=$((total_success + 1))
-    else
-      total_fail=$((total_fail + 1))
-    fi
-  else
-    total_fail=$((total_fail + 1))
-  fi
-
-  # Calculate requests per second
-  end_timestamp=$(date +%s)
-  elapsed_time=$((end_timestamp - start_timestamp))
-  
-  # Avoid division by zero
-  if [ "$elapsed_time" -ne 0 ]; then
-    requests_per_second=$((i / elapsed_time))
-  else
-    requests_per_second=0
-  fi
-
-  # Update and print progress bar
-  progress=$(( (i * 100) / num_runs ))
-  print_progress $progress
-done
-
-# Calculate average time per request
-average_time=$((total_time / num_runs))
-
-# Print summary
-echo -e "\n\nTotal Successful Requests: $total_success"
-echo "Total Failed Requests: $total_fail"
-echo "Average Time per Request: $average_time ms"
-echo "Total Time: $total_time ms"
-echo "Requests Per Second: $requests_per_second"
+echo -e "${GREEN}Smoke test completed.${NC}"

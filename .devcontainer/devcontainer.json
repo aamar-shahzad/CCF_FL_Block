@@ -1,10 +1,41 @@
 {
-  "name": "Development Container for CCF C++ Apps",
-  "context": "..",
-  "image": "mcr.microsoft.com/ccf/app/dev:4.0.7-virtual",
-  "dockerFile": "Dockerfile", // Add this line
-  "runArgs": [],
-  "extensions": [
-    "ms-vscode.cpptools"
-  ]
+  "name": "CCFL CCF Development",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/CCF_FL_Block",
+  "forwardPorts": [8080, 8000, 5000],
+  "portsAttributes": {
+    "8080": {
+      "label": "CCF FL UI + API",
+      "onAutoForward": "openBrowser",
+      "hostPort": 8080
+    },
+    "8000": {
+      "label": "CCF node (HTTPS API only)",
+      "hostPort": 8000
+    },
+    "5000": {
+      "label": "CCF FL UI (alt port)",
+      "hostPort": 5000
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ],
+      "settings": {
+        "remote.autoForwardPorts": true,
+        "remote.autoForwardPortsSource": "hybrid",
+        "cmake.configureArgs": [
+          "-DCOMPILE_TARGET=virtual",
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+        ],
+        "cmake.generator": "Ninja",
+        "cmake.buildDirectory": "${workspaceFolder}/build"
+      }
+    }
+  },
+  "postAttachCommand": "echo 'UI: http://localhost:8080  |  CCF: https://localhost:8000  |  Start UI: cd frontend && ./start-ui.sh'"
 }

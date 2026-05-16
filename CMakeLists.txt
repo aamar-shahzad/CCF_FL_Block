@@ -17,16 +17,13 @@ set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(Boost REQUIRED COMPONENTS log)
-include_directories(3rdparty/NumCpp/include)
 if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
-    # target_link_libraries(lskv PRIVATE ${Boost_LIBRARIES})
 endif()
 
-set(EIGEN_PATH "${CMAKE_SOURCE_DIR}/../../eigen-3.4.0")
-
-
-include_directories(${EIGEN_PATH})
+if(EXISTS "${CMAKE_SOURCE_DIR}/3rdparty/NumCpp/include")
+  include_directories(3rdparty/NumCpp/include)
+endif()
 
 option(CCF_UNSAFE "build with unsafe options" OFF)
 if(${CCF_UNSAFE})
@@ -48,6 +45,7 @@ endif()
 
 
 
+
 option(VERBOSE_LOGGING "enable verbose logging" OFF)
 
 add_compile_definitions(LSKV_VERSION="${LSKV_VERSION}")
@@ -58,7 +56,11 @@ add_ccf_app(
   lskv
   SRCS
   cpp/app/app.cpp
+  cpp/app/handlers_aggregate.cpp
+  cpp/app/handlers_model.cpp
+  cpp/app/offchain_store.cpp
   INCLUDE_DIRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/cpp/app"
   "${CCF_DIR}/include/ccf/_private"
   INSTALL_LIBS
   ON)

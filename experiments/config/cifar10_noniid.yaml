@@ -1,0 +1,15 @@
+dataset: cifar10
+method: ccfl
+num_clients: 20
+rounds: 15
+distribution: non_iid
+alpha: 0.5
+malicious_frac: 0.3
+attack: model_poisoning
+local_epochs: 2
+register_clients: true
+offchain: true
+partitioned: true
+k_sigma: 2.5
+seed: 42
+fl_backend: numpy

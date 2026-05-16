@@ -1,0 +1,14 @@
+# Publishes UI (8080) and CCF (8000) to the Mac host — required for localhost in Safari/Chrome.
+services:
+  app:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspaces/CCF_FL_Block:cached
+    command: sleep infinity
+    ports:
+      - "8080:8080"
+      - "8000:8000"
+      - "5000:5000"

@@ -1,0 +1,14 @@
+# Blockchain-FL baseline: all weight data stored on CCF ledger (no off-chain refs).
+dataset: mnist
+method: blockchain_fl
+num_clients: 10
+sandbox_users: 10
+rounds: 5
+distribution: iid
+malicious_frac: 0.2
+attack: none
+local_epochs: 1
+register_clients: true
+offchain: false
+seed: 42
+fl_backend: numpy

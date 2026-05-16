@@ -1,0 +1,16 @@
+dataset: cifar10
+method: ccfl
+num_clients: 10
+rounds: 10
+distribution: non_iid
+malicious_frac: 0.3
+attack: model_poisoning
+local_epochs: 2
+register_clients: true
+offchain: true
+k_sigma: 2.5
+use_adaptive: false
+ccf_query_extra:
+  use_adaptive: "false"
+seed: 42
+fl_backend: numpy
